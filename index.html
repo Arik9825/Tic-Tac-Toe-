@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe vs AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            text-align: center;
+            margin: 20px;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+            font-size: 20px;
+        }
+
+        .score-item {
+            background-color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #player-score {
+            color: #e74c3c;
+        }
+
+        #ai-score {
+            color: #3498db;
+        }
+
+        #tie-score {
+            color: #7f8c8d;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 5px;
+            margin: 20px;
+            background-color: #333;
+            padding: 5px;
+            border-radius: 10px;
+        }
+
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: white;
+            border: none;
+            font-size: 40px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .cell:hover {
+            background-color: #eee;
+        }
+
+        .status {
+            font-size: 24px;
+            margin: 20px;
+            font-weight: bold;
+        }
+
+        .reset-btn {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .reset-btn:hover {
+            background-color: #45a049;
+        }
+
+        .x-mark {
+            color: #e74c3c;
+        }
+
+        .o-mark {
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tic Tac Toe vs AI</h1>
+        <div class="scoreboard">
+            <div class="score-item">
+                Player: <span id="player-score">0</span>
+            </div>
+            <div class="score-item">
+                Ties: <span id="tie-score">0</span>
+            </div>
+            <div class="score-item">
+                AI: <span id="ai-score">0</span>
+            </div>
+        </div>
+        <div class="status" id="status">Your turn (X)</div>
+        <div class="board" id="board">
+            <button class="cell" data-index="0"></button>
+            <button class="cell" data-index="1"></button>
+            <button class="cell" data-index="2"></button>
+            <button class="cell" data-index="3"></button>
+            <button class="cell" data-index="4"></button>
+            <button class="cell" data-index="5"></button>
+            <button class="cell" data-index="6"></button>
+            <button class="cell" data-index="7"></button>
+            <button class="cell" data-index="8"></button>
+        </div>
+        <button class="reset-btn" onclick="resetGame()">Reset Game</button>
+        <button class="reset-btn" onclick="resetGame(true)" style="margin-top: 10px;">
+            Reset Scores
+        </button>
+    </div>
+
+    <script>
+        let board = ['', '', '', '', '', '', '', '', ''];
+        let gameActive = true;
+        const humanPlayer = 'X';
+        const aiPlayer = 'O';
+        const winCombos = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        // Initialize scores from localStorage
+        let playerWins = parseInt(localStorage.getItem('playerWins')) || 0;
+        let aiWins = parseInt(localStorage.getItem('aiWins')) || 0;
+        let ties = parseInt(localStorage.getItem('ties')) || 0;
+
+        updateScoresDisplay();
+
+        document.querySelectorAll('.cell').forEach(cell => {
+            cell.addEventListener('click', () => handleClick(cell));
+        });
+
+        function handleClick(cell) {
+            const index = parseInt(cell.dataset.index);
+            
+            if (board[index] === '' && gameActive) {
+                makeMove(index, humanPlayer);
+                
+                if (!checkWin(board, humanPlayer) && !checkTie()) {
+                    setTimeout(() => {
+                        aiMove();
+                    }, 500);
+                }
+            }
+        }
+
+        function makeMove(index, player) {
+            board[index] = player;
+            const cell = document.querySelector(`[data-index="${index}"]`);
+            cell.textContent = player;
+            cell.classList.add(player === 'X' ? 'x-mark' : 'o-mark');
+            cell.disabled = true;
+            
+            if (checkWin(board, player)) {
+                gameActive = false;
+                if (player === humanPlayer) {
+                    playerWins++;
+                    document.getElementById('status').textContent = 'You win!';
+                } else {
+                    aiWins++;
+                    document.getElementById('status').textContent = 'AI wins!';
+                }
+                updateScores();
+            } else if (checkTie()) {
+                gameActive = false;
+                ties++;
+                document.getElementById('status').textContent = 'Game tied!';
+                updateScores();
+            }
+        }
+
+        function aiMove() {
+            let move = findWinningMove(aiPlayer) || 
+                      findWinningMove(humanPlayer) || 
+                      takeCenter() || 
+                      takeCorner() || 
+                      takeRandom();
+            
+            if (move !== undefined) {
+                makeMove(move, aiPlayer);
+            }
+        }
+
+        function findWinningMove(player) {
+            for (let i = 0; i < board.length; i++) {
+                if (board[i] === '') {
+                    let testBoard = [...board];
+                    testBoard[i] = player;
+                    if (checkWin(testBoard, player)) {
+                        return i;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function takeCenter() {
+            return board[4] === '' ? 4 : null;
+        }
+
+        function takeCorner() {
+            const corners = [0, 2, 6, 8];
+            const emptyCorners = corners.filter(index => board[index] === '');
+            return emptyCorners.length > 0 ? 
+                emptyCorners[Math.floor(Math.random() * emptyCorners.length)] : null;
+        }
+
+        function takeRandom() {
+            const emptyCells = [];
+            for (let i = 0; i < board.length; i++) {
+                if (board[i] === '') emptyCells.push(i);
+            }
+            return emptyCells.length > 0 ? 
+                emptyCells[Math.floor(Math.random() * emptyCells.length)] : null;
+        }
+
+        function checkWin(currentBoard, player) {
+            return winCombos.some(combo => {
+                return combo.every(index => currentBoard[index] === player);
+            });
+        }
+
+        function checkTie() {
+            return board.every(cell => cell !== '');
+        }
+
+        function resetGame(fullReset = false) {
+            board = ['', '', '', '', '', '', '', '', ''];
+            gameActive = true;
+            document.getElementById('status').textContent = 'Your turn (X)';
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.textContent = '';
+                cell.disabled = false;
+                cell.classList.remove('x-mark', 'o-mark');
+            });
+            
+            if (fullReset) {
+                playerWins = 0;
+                aiWins = 0;
+                ties = 0;
+                updateScores();
+            }
+        }
+
+        function updateScores() {
+            localStorage.setItem('playerWins', playerWins);
+            localStorage.setItem('aiWins', aiWins);
+            localStorage.setItem('ties', ties);
+            updateScoresDisplay();
+        }
+
+        function updateScoresDisplay() {
+            document.getElementById('player-score').textContent = playerWins;
+            document.getElementById('ai-score').textContent = aiWins;
+            document.getElementById('tie-score').textContent = ties;
+        }
+    </script>
+</body>
+</html>
